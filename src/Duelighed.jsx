@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DUE, DUE_SECTIONS, tackOf } from "./duelighed.js";
+import { tackOf } from "./duelighed.js";
 
 /* ------------------------------------------------------------------ */
 /*  Duelighed — scenario-tegning + spørgsmålstyper + runde-motor       */
@@ -54,13 +54,14 @@ function Boat({ C, kind, hdg, x, y, wind, label }) {
   );
 }
 
-export function ScenarioDiagram({ C, s }) {
+export function ScenarioDiagram({ C, s, T }) {
+  const kindName = T?.kind ?? { sail: "sejl", motor: "motor", row: "robåd" };
+  const windWord = T?.wind ?? "VIND";
   // Vindpil: kommer FRA s.wind. Placeres ved kanten i vindens retning.
   // Pilen sidder i kanten i vindens retning, men kan flyttes langs kanten (windAt) hvis en båd er i vejen
   const r = (s.wind * Math.PI) / 180;
   const ra = ((s.windAt ?? s.wind) * Math.PI) / 180;
   const cx = 150 + Math.sin(ra) * 104, cy = 150 - Math.cos(ra) * 104;
-  const kindName = { sail: "sejl", motor: "motor", row: "robåd" };
   return (
     <svg viewBox="0 0 300 300" width="100%" style={{ display: "block", maxHeight: 300 }}>
       <rect x="0" y="0" width="300" height="300" rx="14" fill={C.bg} />
@@ -72,7 +73,7 @@ export function ScenarioDiagram({ C, s }) {
           <path d="M0,-10 L0,22 M0,22 l-6,-8 M0,22 l6,-8" stroke={C.steel} strokeWidth="2.2" fill="none" />
         </g>
         {/* teksten holdes vandret, placeret på vindsiden af pilen */}
-        <text x={Math.max(-cx + 24, Math.min(300 - cx - 24, Math.sin(r) * 22))} y={-Math.cos(r) * 22 + 4} textAnchor="middle" fontSize="11" letterSpacing="2" fontWeight="700" fill={C.gold}>VIND</text>
+        <text x={Math.max(-cx + 24, Math.min(300 - cx - 24, Math.sin(r) * 22))} y={-Math.cos(r) * 22 + 4} textAnchor="middle" fontSize="11" letterSpacing="2" fontWeight="700" fill={C.gold}>{windWord}</text>
       </g>
       {s.overtaking && (() => { const o = s.overtaking === "b" ? s.b : s.a, t = o === s.a ? s.b : s.a; return (
         <path d={`M${o.x},${o.y - 34} L${t.x},${t.y + 34}`} stroke={C.steel} strokeOpacity="0.45" strokeWidth="1.5" strokeDasharray="4 4" />
@@ -84,7 +85,7 @@ export function ScenarioDiagram({ C, s }) {
 }
 
 /* ---------- Runde-motor ---------- */
-export function useDueRound(sec) {
+export function useDueRound(sec, DUE) {
   const [state, setState] = useState(null);
   function start() {
     const pool = DUE.filter((d) => d.sec === sec);
@@ -116,12 +117,12 @@ export function useDueRound(sec) {
 }
 
 /* ---------- Spørgsmåls-renderere ---------- */
-function Feedback({ C, ok, title, note, onNext, last, btn }) {
+function Feedback({ C, T, ok, title, note, onNext, last, btn }) {
   return (
     <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${ok ? C.good : C.accent}` }}>
-      <div style={{ fontWeight: 700, color: ok ? C.good : C.accentSoft, marginBottom: 4 }}>{ok ? "Rigtigt!" : title}</div>
+      <div style={{ fontWeight: 700, color: ok ? C.good : C.accentSoft, marginBottom: 4 }}>{ok ? T.correct : title}</div>
       <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{note}</div>
-      <button onClick={onNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{last ? "Se resultat" : "Næste →"}</button>
+      <button onClick={onNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{last ? T.seeResult : T.next}</button>
     </div>
   );
 }
@@ -136,26 +137,26 @@ const optStyle = (C, btn, state, isCorrect, isPicked) => {
   return { ...btn, background: bg, border: `1.5px solid ${bd}`, color: col, cursor: state ? "default" : "pointer" };
 };
 
-export function ScenarioQ({ C, btn, q, onAnswer, onNext, last }) {
+export function ScenarioQ({ C, T, btn, q, onAnswer, onNext, last }) {
   const [picked, setPicked] = useState(null);
   useEffect(() => setPicked(null), [q.id]);
-  const opts = [["a", "A viger"], ["b", "B viger"], ["both", "Begge viger"], ["none", "Ingen — fri passage"]];
-  const label = { a: "A viger", b: "B viger", both: "Begge viger", none: "Ingen viger" };
+  const opts = [["a", T.aGives], ["b", T.bGives], ["both", T.bothGive], ["none", T.noneGive]];
+  const label = { a: T.aGives, b: T.bGives, both: T.bothGive, none: T.noneLbl };
   return (
     <div>
-      <div style={{ background: C.bg, borderRadius: 12, padding: 6, marginBottom: 12 }}><ScenarioDiagram C={C} s={q} /></div>
-      <p style={{ margin: "0 0 12px", fontSize: 16, color: C.sail }}>Hvem skal vige?</p>
+      <div style={{ background: C.bg, borderRadius: 12, padding: 6, marginBottom: 12 }}><ScenarioDiagram C={C} s={q} T={T} /></div>
+      <p style={{ margin: "0 0 12px", fontSize: 16, color: C.sail }}>{T.whoGives}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {opts.map(([k, l]) => (
           <button key={k} disabled={!!picked} onClick={() => { setPicked(k); onAnswer(k === q.answer); }} style={optStyle(C, btn, picked, k === q.answer, k === picked)}>{l}</button>
         ))}
       </div>
-      {picked && <Feedback C={C} btn={btn} ok={picked === q.answer} title={`Rigtigt svar: ${label[q.answer]} (${q.rule})`} note={q.note} onNext={onNext} last={last} />}
+      {picked && <Feedback C={C} T={T} btn={btn} ok={picked === q.answer} title={`${T.rightAnswer} ${label[q.answer]} (${q.rule})`} note={q.note} onNext={onNext} last={last} />}
     </div>
   );
 }
 
-export function McqQ({ C, btn, q, onAnswer, onNext, last }) {
+export function McqQ({ C, T, btn, q, onAnswer, onNext, last }) {
   const [opts, setOpts] = useState([]);
   const [picked, setPicked] = useState(null);
   useEffect(() => { setOpts(shuffle([q.a, ...q.wrong])); setPicked(null); }, [q.id]);
@@ -167,12 +168,12 @@ export function McqQ({ C, btn, q, onAnswer, onNext, last }) {
           <button key={o} disabled={!!picked} onClick={() => { setPicked(o); onAnswer(o === q.a); }} style={{ ...optStyle(C, btn, picked, o === q.a, o === picked), fontSize: 15, lineHeight: 1.35 }}>{o}</button>
         ))}
       </div>
-      {picked && <Feedback C={C} btn={btn} ok={picked === q.a} title={`Rigtigt: ${q.a}`} note={q.note} onNext={onNext} last={last} />}
+      {picked && <Feedback C={C} T={T} btn={btn} ok={picked === q.a} title={`${T.rightIs} ${q.a}`} note={q.note} onNext={onNext} last={last} />}
     </div>
   );
 }
 
-export function OrderQ({ C, btn, q, onAnswer, onNext, last }) {
+export function OrderQ({ C, T, btn, q, onAnswer, onNext, last }) {
   const [pool, setPool] = useState([]);       // indices tilbage, blandet
   const [placed, setPlaced] = useState([]);   // indices i den rækkefølge brugeren har valgt
   const [wrongHit, setWrongHit] = useState(null);
@@ -189,7 +190,7 @@ export function OrderQ({ C, btn, q, onAnswer, onNext, last }) {
   return (
     <div>
       <p style={{ margin: "0 0 4px", fontSize: 17, lineHeight: 1.4, color: C.sail, fontFamily: "'Fraunces',serif" }}>{q.q}</p>
-      <p style={{ margin: "0 0 12px", fontSize: 13, color: "rgba(239,230,210,0.65)" }}>Tryk på trinnene i rigtig rækkefølge — første trin først.</p>
+      <p style={{ margin: "0 0 12px", fontSize: 13, color: "rgba(239,230,210,0.65)" }}>{T.tapSteps}</p>
       {placed.length > 0 && (
         <ol style={{ margin: "0 0 12px", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 6 }}>
           {placed.map((i, n) => <li key={i} style={{ fontSize: 14, lineHeight: 1.4, color: C.good }}>{q.steps[i]}</li>)}
@@ -202,7 +203,7 @@ export function OrderQ({ C, btn, q, onAnswer, onNext, last }) {
           ))}
         </div>
       )}
-      {done && <Feedback C={C} btn={btn} ok={!failed} title="Du ramte forkert undervejs — rækkefølgen ovenfor er den rigtige" note={q.note} onNext={onNext} last={last} />}
+      {done && <Feedback C={C} T={T} btn={btn} ok={!failed} title={T.orderWrong} note={q.note} onNext={onNext} last={last} />}
     </div>
   );
 }

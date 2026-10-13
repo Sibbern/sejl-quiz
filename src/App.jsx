@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { PARTS, GAMES, BASICS, VOCAB, CATS } from "./data.js";
-import { DUE, DUE_SECTIONS, DUE_VOCAB } from "./duelighed.js";
+import { DUE as DUE_DA, DUE_SECTIONS as SECTIONS_DA, DUE_VOCAB } from "./duelighed.js";
+import { UI, EN } from "./en.js";
 import { useDueRound, ScenarioQ, McqQ, OrderQ } from "./Duelighed.jsx";
 
 /* Oversæt-pool: alle tegnings-dele + det rene ordforråd, i ét format. */
@@ -10,6 +11,23 @@ const TERMS = [
   ...DUE_VOCAB,
 ];
 const ROUND = 15; // spørgsmål pr. runde (forkerte svar kommer igen bagefter)
+
+/* Sprog: dansk er kilden; "en" lægges ovenpå pr. id (src/en.js). I EN-mode bytter
+   tegnings-delene da/en, så quizzen spørger på engelsk og viser dansk som gloss.
+   Oversæt bruger altid de rå TERMS (ægte da↔en). */
+const LANG_KEY = "sejl-quiz:lang";
+function loadLang() { try { return localStorage.getItem(LANG_KEY) === "en" ? "en" : "da"; } catch { return "da"; } }
+function localize(lang) {
+  if (lang !== "en") return { PARTS, GAMES, BASICS, DUE: DUE_DA, DUE_SECTIONS: SECTIONS_DA, CATS };
+  return {
+    PARTS: PARTS.map((p) => ({ ...p, da: p.en, en: p.da, note: EN.parts[p.id] ?? p.note })),
+    GAMES: GAMES.map((g) => ({ ...g, ...(EN.games[g.id] || {}) })),
+    BASICS: BASICS.map((b, i) => ({ ...b, t: b.e, e: b.t, d: EN.basics[i]?.d ?? b.d })),
+    DUE: DUE_DA.map((d) => ({ ...d, ...(EN.due[d.id] || {}) })),
+    DUE_SECTIONS: SECTIONS_DA.map((x) => ({ ...x, ...(EN.sections[x.id] || {}) })),
+    CATS: { ...CATS, ...EN.cats },
+  };
+}
 
 /* Skriv-svar: normalisér og accepter små stavefejl. "To beat (to windward)" matcher
    "beat", "to beat", "beat to windward"; "Draught (draft)" matcher "draft". */
@@ -396,6 +414,10 @@ export { Diagram };
 /* ------------------------------------------------------------------ */
 
 export default function App() {
+  const [lang, setLang] = useState(() => loadLang());
+  const T = UI[lang];
+  const { PARTS, GAMES, BASICS, DUE, DUE_SECTIONS, CATS } = useMemo(() => localize(lang), [lang]);
+  function toggleLang() { const l = lang === "da" ? "en" : "da"; setLang(l); setMode("home"); try { localStorage.setItem(LANG_KEY, l); } catch {} }
   const [mode, setMode] = useState("home"); // home | basics | study | quiz | result
   const [game, setGame] = useState("boat");
   const [studyActive, setStudyActive] = useState(null);
@@ -420,7 +442,7 @@ export default function App() {
   // ---- Duelighed ----
   const [dueSec, setDueSec] = useState("vige");
   const [dueStartSec, setDueStart] = useState(null);
-  const due = useDueRound(dueSec);
+  const due = useDueRound(dueSec, DUE);
   function startDue(sec) { setDueSec(sec); setDueStart(sec); setMode("due"); }
   // start() skal køre EFTER dueSec er sat (hook'en læser sec fra closure), derfor via effect
   useEffect(() => { if (mode === "due" && dueStartSec && dueStartSec === dueSec) { due.start(); setDueStart(null); } }, [mode, dueStartSec, dueSec]);
@@ -470,7 +492,7 @@ export default function App() {
     setTCur(tMake(q[0], tDir)); setTQueue(q.slice(1)); setTPicked(null); setTTyped("");
   }
 
-  const pool = useMemo(() => PARTS.filter((p) => p.game === game), [game]);
+  const pool = useMemo(() => PARTS.filter((p) => p.game === game), [game, PARTS]); // PARTS skifter med sprog
   const current = mode === "quiz" ? PARTS.find((p) => p.id === order[idx]) : null;
 
   const makeOptions = (part) => shuffle([part, ...shuffle(pool.filter((p) => p.id !== part.id)).slice(0, 3)]);
@@ -512,8 +534,11 @@ export default function App() {
 
       <div style={shell}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: C.gold, fontWeight: 600 }}>Sejl &amp; rig</div>
-          <h1 style={{ fontFamily: "'Fraunces',serif", fontWeight: 600, fontStyle: "italic", fontSize: 32, margin: "2px 0 0", color: C.sail }}>Lær bådens dele</h1>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: C.gold, fontWeight: 600 }}>{T.kicker}</div>
+            <button onClick={toggleLang} aria-label="Skift sprog / switch language" style={{ background: "transparent", border: "1px solid rgba(216,166,87,0.5)", color: C.gold, borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", fontFamily: "'Hanken Grotesk',sans-serif" }}>{lang === "da" ? "EN" : "DA"}</button>
+          </div>
+          <h1 style={{ fontFamily: "'Fraunces',serif", fontWeight: 600, fontStyle: "italic", fontSize: 32, margin: "2px 0 0", color: C.sail }}>{T.title}</h1>
         </div>
 
         {(mode === "home" || mode === "study" || mode === "quiz") && (
@@ -525,10 +550,10 @@ export default function App() {
         {/* ---------------- HOME ---------------- */}
         {mode === "home" && (
           <div style={card}>
-            <button onClick={() => setMode("basics")} style={{ ...btn, textAlign: "center", background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>Forstå grundbegreberne →</button>
-            <button onClick={() => startTranslate()} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginBottom: 14 }}>Oversæt dansk ↔ engelsk · {TERMS.length} ord</button>
+            <button onClick={() => setMode("basics")} style={{ ...btn, textAlign: "center", background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>{T.basics}</button>
+            <button onClick={() => startTranslate()} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginBottom: 14 }}>{T.translate(TERMS.length)}</button>
             <p style={{ margin: "0 0 14px", lineHeight: 1.5, color: "rgba(239,230,210,0.8)", fontSize: 15 }}>
-              Vælg et spil. Hver del har sin egen tegning, så du tydeligt kan se hvad der peges på.
+              {T.pickGame}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {GAMES.map((g) => {
@@ -537,13 +562,13 @@ export default function App() {
                   <button key={g.id} onClick={() => openDel(g.id)}
                     style={{ ...btn, background: C.panelHi, border: "1.5px solid rgba(216,166,87,0.4)", color: C.cream, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span><span style={{ display: "block", fontSize: 16 }}>{g.t}</span><span style={{ fontSize: 13, color: "rgba(239,230,210,0.65)", fontWeight: 500 }}>{g.s}</span></span>
-                    <span style={{ fontSize: 13, color: C.gold }}>{n} dele →</span>
+                    <span style={{ fontSize: 13, color: C.gold }}>{T.parts(n)}</span>
                   </button>
                 );
               })}
             </div>
-            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: C.gold, fontWeight: 600, margin: "22px 0 8px" }}>Duelighed</div>
-            <p style={{ margin: "0 0 10px", lineHeight: 1.5, color: "rgba(239,230,210,0.8)", fontSize: 14 }}>Teorien bag den praktiske prøve — efter sejlerskolens egne hæfter.</p>
+            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: C.gold, fontWeight: 600, margin: "22px 0 8px" }}>{T.due}</div>
+            <p style={{ margin: "0 0 10px", lineHeight: 1.5, color: "rgba(239,230,210,0.8)", fontSize: 14 }}>{T.dueIntro}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {DUE_SECTIONS.map((g) => {
                 const n = DUE.filter((d) => d.sec === g.id).length;
@@ -564,16 +589,16 @@ export default function App() {
           const st = due.state; const q = DUE.find((d) => d.id === st.cur); const meta = DUE_SECTIONS.find((s) => s.id === dueSec);
           const n = st.asked + 1, total = st.asked + 1 + st.queue.length;
           const last = st.queue.length === 0 && (st.missed.length === 0 || st.retry);
-          const common = { C, btn, q, onAnswer: due.record, onNext: due.next, last };
+          const common = { C, btn, q, T, onAnswer: due.record, onNext: due.next, last };
           return (
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
                 <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>{meta.t}</h2>
-                <button onClick={() => setMode("home")} style={back}>← Forside</button>
+                <button onClick={() => setMode("home")} style={back}>{T.home}</button>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(239,230,210,0.7)", marginBottom: 8 }}>
-                <span>{st.retry ? "Gentag de forkerte" : "Runde"} — {n}/{total}</span>
-                <span style={{ color: C.gold }}>{st.right} rigtige</span>
+                <span>{st.retry ? T.retryRound : T.round} — {n}/{total}</span>
+                <span style={{ color: C.gold }}>{st.right} {T.right}</span>
               </div>
               <div style={{ height: 5, background: "rgba(157,179,196,0.2)", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${(st.asked / total) * 100}%`, background: C.gold, borderRadius: 99, transition: "width .3s" }} />
@@ -589,10 +614,10 @@ export default function App() {
           <div style={{ ...card, textAlign: "center" }}>
             <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>{DUE_SECTIONS.find((s) => s.id === dueSec).t}</div>
             <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 52, color: C.sail, lineHeight: 1.1, margin: "6px 0" }}>{due.state.right}<span style={{ fontSize: 28, color: "rgba(239,230,210,0.6)" }}>/{due.state.asked}</span></div>
-            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{due.state.retry ? "De forkerte kom igen — de trækkes oftere næste gang." : "Alt rigtigt i første hug ⚓"}</p>
+            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{due.state.retry ? T.dueMissed : T.allRight}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={() => startDue(dueSec)} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>Ny runde</button>
-              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>Forside</button>
+              <button onClick={() => startDue(dueSec)} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>{T.newRound}</button>
+              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>{T.front}</button>
             </div>
           </div>
         )}
@@ -601,10 +626,10 @@ export default function App() {
         {mode === "basics" && (
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-              <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 22, margin: 0, color: C.sail }}>Grundbegreber</h2>
-              <button onClick={() => setMode("home")} style={back}>← Forside</button>
+              <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 22, margin: 0, color: C.sail }}>{T.basicsTitle}</h2>
+              <button onClick={() => setMode("home")} style={back}>{T.home}</button>
             </div>
-            <p style={{ margin: "0 0 14px", fontSize: 14, color: "rgba(239,230,210,0.75)", lineHeight: 1.5 }}>De vigtigste ord-typer. Når du forstår disse, giver de fleste enkeltdele sig selv.</p>
+            <p style={{ margin: "0 0 14px", fontSize: 14, color: "rgba(239,230,210,0.75)", lineHeight: 1.5 }}>{T.basicsIntro}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {BASICS.map((b) => (
                 <div key={b.t} style={{ background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${C.gold}` }}>
@@ -624,7 +649,7 @@ export default function App() {
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
               <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>{gameMeta.t}</h2>
-              <button onClick={() => setMode("home")} style={back}>← Forside</button>
+              <button onClick={() => setMode("home")} style={back}>{T.home}</button>
             </div>
 
             {studyActive && (() => {
@@ -632,7 +657,7 @@ export default function App() {
               return (
                 <div style={{ background: C.panelHi, borderRadius: 12, padding: 14, marginBottom: 14, borderLeft: `3px solid ${C.accent}` }}>
                   <div style={{ fontFamily: "'Fraunces',serif", fontSize: 22, color: C.sail }}>{pp.da}</div>
-                  <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>engelsk: {pp.en}</div>
+                  <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>{T.gloss} {pp.en}</div>
                   <div style={{ fontSize: 14.5, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{pp.note}</div>
                 </div>
               );
@@ -647,7 +672,7 @@ export default function App() {
               ))}
             </div>
 
-            <button onClick={startQuiz} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 16 }}>Start quiz · {pool.length} dele</button>
+            <button onClick={startQuiz} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 16 }}>{T.startQuiz(pool.length)}</button>
           </div>
         )}
 
@@ -656,12 +681,12 @@ export default function App() {
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(239,230,210,0.7)", marginBottom: 8 }}>
               <span>{gameMeta.t.split(" · ")[0]} — {idx + 1}/{order.length}</span>
-              <span style={{ color: C.gold }}>{correct} rigtige</span>
+              <span style={{ color: C.gold }}>{correct} {T.right}</span>
             </div>
             <div style={{ height: 5, background: "rgba(157,179,196,0.2)", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${(idx / order.length) * 100}%`, background: C.gold, borderRadius: 99, transition: "width .3s" }} />
             </div>
-            <p style={{ margin: "0 0 14px", fontSize: 16, color: C.sail }}>Hvad hedder den markerede del?</p>
+            <p style={{ margin: "0 0 14px", fontSize: 16, color: C.sail }}>{T.whichPart}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {options.map((o) => {
                 let bg = "rgba(157,179,196,0.10)", bd = "rgba(157,179,196,0.25)", col = C.cream;
@@ -675,9 +700,9 @@ export default function App() {
             </div>
             {picked && (
               <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${picked.id === current.id ? C.good : C.accent}` }}>
-                <div style={{ fontWeight: 700, color: picked.id === current.id ? C.good : C.accentSoft, marginBottom: 4 }}>{picked.id === current.id ? "Rigtigt!" : `Det var: ${current.da}`}</div>
+                <div style={{ fontWeight: 700, color: picked.id === current.id ? C.good : C.accentSoft, marginBottom: 4 }}>{picked.id === current.id ? T.correct : `${T.itWas} ${current.da}`}</div>
                 <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}><span style={{ color: C.gold }}>{current.en}.</span> {current.note}</div>
-                <button onClick={next} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{idx + 1 >= order.length ? "Se resultat" : "Næste →"}</button>
+                <button onClick={next} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{idx + 1 >= order.length ? T.seeResult : T.next}</button>
               </div>
             )}
           </div>
@@ -688,11 +713,11 @@ export default function App() {
           <div style={{ ...card, textAlign: "center" }}>
             <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>{gameMeta.t}</div>
             <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 52, color: C.sail, lineHeight: 1.1, margin: "6px 0" }}>{correct}<span style={{ fontSize: 28, color: "rgba(239,230,210,0.6)" }}>/{order.length}</span></div>
-            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{correct === order.length ? "Helt perfekt! ⚓" : correct >= order.length * 0.7 ? "Flot sejlet — et par stykker mangler endnu." : "God start — kør en runde til, så sidder de fast."}</p>
+            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{correct === order.length ? T.perfect : correct >= order.length * 0.7 ? T.good : T.again}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={startQuiz} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>Prøv igen</button>
-              <button onClick={() => setMode("study")} style={{ ...btn, textAlign: "center", background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}` }}>Gennemgå delene</button>
-              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>Forside</button>
+              <button onClick={startQuiz} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>{T.retry}</button>
+              <button onClick={() => setMode("study")} style={{ ...btn, textAlign: "center", background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}` }}>{T.review}</button>
+              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>{T.front}</button>
             </div>
           </div>
         )}
@@ -708,29 +733,29 @@ export default function App() {
           return (
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-                <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>Oversæt</h2>
-                <button onClick={() => setMode("home")} style={back}>← Forside</button>
+                <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>{T.trTitle}</h2>
+                <button onClick={() => setMode("home")} style={back}>{T.home}</button>
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                {[["da2en", "Dansk → engelsk"], ["en2da", "Engelsk → dansk"], ["mix", "Blandet"]].map(([k, l]) => (
+                {[["da2en", T.da2en], ["en2da", T.en2da], ["mix", T.mix]].map(([k, l]) => (
                   <button key={k} onClick={() => startTranslate(k, tKind)}
                     style={{ flex: 1, padding: "7px 4px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "'Hanken Grotesk',sans-serif", background: tDir === k ? C.gold : "rgba(157,179,196,0.12)", color: tDir === k ? C.ink : C.cream, border: `1px solid ${tDir === k ? C.gold : "rgba(157,179,196,0.25)"}` }}>{l}</button>
                 ))}
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                {[["choice", "Vælg blandt 4"], ["type", "Skriv svaret"]].map(([k, l]) => (
+                {[["choice", T.choice], ["type", T.type]].map(([k, l]) => (
                   <button key={k} onClick={() => startTranslate(tDir, k)}
                     style={{ flex: 1, padding: "7px 4px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "'Hanken Grotesk',sans-serif", background: tKind === k ? C.accent : "rgba(157,179,196,0.12)", color: tKind === k ? C.ink : C.cream, border: `1px solid ${tKind === k ? C.accent : "rgba(157,179,196,0.25)"}` }}>{l}</button>
                 ))}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(239,230,210,0.7)", marginBottom: 8 }}>
-                <span>{tDone ? "Gentag de forkerte" : "Runde"} — {n}/{total}</span>
-                <span style={{ color: C.gold }}>{tScore.right} rigtige</span>
+                <span>{tDone ? T.retryRound : T.round} — {n}/{total}</span>
+                <span style={{ color: C.gold }}>{tScore.right} {T.right}</span>
               </div>
               <div style={{ height: 5, background: "rgba(157,179,196,0.2)", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${(tScore.asked / total) * 100}%`, background: C.gold, borderRadius: 99, transition: "width .3s" }} />
               </div>
-              <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: C.gold, fontWeight: 600 }}>{CATS[tCur.term.cat]} · {q ? "på engelsk?" : "på dansk?"}</div>
+              <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: C.gold, fontWeight: 600 }}>{CATS[tCur.term.cat]} · {q ? T.inEn : T.inDa}</div>
               <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 30, color: C.sail, margin: "4px 0 16px", lineHeight: 1.15 }}>{prompt}</div>
               {tKind === "choice" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -747,16 +772,16 @@ export default function App() {
               ) : (
               <form onSubmit={(e) => { e.preventDefault(); tSubmit(); }} style={{ display: "flex", gap: 8 }}>
                 <input value={tTyped} onChange={(e) => setTTyped(e.target.value)} disabled={!!tPicked} autoFocus autoCapitalize="off" autoCorrect="off" spellCheck={false}
-                  placeholder={q ? "engelsk…" : "dansk…"}
+                  placeholder={q ? T.phEn : T.phDa}
                   style={{ flex: 1, padding: "13px 14px", borderRadius: 12, fontSize: 17, fontFamily: "'Hanken Grotesk',sans-serif", background: "rgba(157,179,196,0.10)", color: C.sail, border: `1.5px solid ${tPicked ? (ok ? C.good : C.bad) : "rgba(157,179,196,0.35)"}`, outline: "none" }} />
-                <button type="submit" disabled={!!tPicked || !tTyped.trim()} style={{ ...btn, width: "auto", textAlign: "center", background: C.accent, color: C.ink, opacity: tPicked || !tTyped.trim() ? 0.5 : 1 }}>Tjek</button>
+                <button type="submit" disabled={!!tPicked || !tTyped.trim()} style={{ ...btn, width: "auto", textAlign: "center", background: C.accent, color: C.ink, opacity: tPicked || !tTyped.trim() ? 0.5 : 1 }}>{T.check}</button>
               </form>
               )}
               {tPicked && (
                 <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${ok ? C.good : C.accent}` }}>
-                  <div style={{ fontWeight: 700, color: ok ? C.good : C.accentSoft, marginBottom: 4 }}>{ok ? "Rigtigt!" : `${tCur.term.da} = ${tCur.term.en}`}</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{tCur.term.note}</div>
-                  <button autoFocus={tKind === "type"} onClick={tNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{tQueue.length === 0 && (tMissed.length === 0 || tDone) ? "Se resultat" : "Næste →"}</button>
+                  <div style={{ fontWeight: 700, color: ok ? C.good : C.accentSoft, marginBottom: 4 }}>{ok ? T.correct : `${tCur.term.da} = ${tCur.term.en}`}</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{lang === "en" ? (EN.vocab[tCur.term.id] ?? EN.parts[tCur.term.id] ?? tCur.term.note) : tCur.term.note}</div>
+                  <button autoFocus={tKind === "type"} onClick={tNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{tQueue.length === 0 && (tMissed.length === 0 || tDone) ? T.seeResult : T.next}</button>
                 </div>
               )}
             </div>
@@ -765,12 +790,12 @@ export default function App() {
 
         {mode === "tresult" && (
           <div style={{ ...card, textAlign: "center" }}>
-            <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>Oversæt</div>
+            <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>{T.trTitle}</div>
             <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 52, color: C.sail, lineHeight: 1.1, margin: "6px 0" }}>{tScore.right}<span style={{ fontSize: 28, color: "rgba(239,230,210,0.6)" }}>/{tScore.asked}</span></div>
-            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{tDone ? "De forkerte kom igen — en runde mere i morgen, så sidder de." : "Alt rigtigt i første hug ⚓"}{Object.keys(tWeak).length > 0 && <><br /><span style={{ fontSize: 13, color: "rgba(239,230,210,0.6)" }}>{Object.keys(tWeak).length} ord driller stadig — de kommer oftere i næste runde.</span></>}</p>
+            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{tDone ? T.missedAgain : T.allRight}{Object.keys(tWeak).length > 0 && <><br /><span style={{ fontSize: 13, color: "rgba(239,230,210,0.6)" }}>{T.weak(Object.keys(tWeak).length)}</span></>}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={() => startTranslate()} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>Ny runde</button>
-              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>Forside</button>
+              <button onClick={() => startTranslate()} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>{T.newRound}</button>
+              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>{T.front}</button>
             </div>
           </div>
         )}
@@ -781,7 +806,7 @@ export default function App() {
           <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
           </svg>
-          Se koden på GitHub
+          {T.github}
         </a>
       </div>
     </div>
