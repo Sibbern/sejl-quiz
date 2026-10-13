@@ -83,7 +83,7 @@ export const GAMES = [
  */
 export const CATS = {
   boat: "Sejl & rig", top: "Mastetop", bottom: "Mastefod", wind: "Sejladsformer",
-  sides: "Sider & halse", man: "Manøvrer", gear: "Grej & skrog",
+  sides: "Sider & halse", man: "Manøvrer", gear: "Grej & skrog", knob: "Knob & stik",
 };
 
 export const VOCAB = [

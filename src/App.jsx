@@ -1,10 +1,13 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { PARTS, GAMES, BASICS, VOCAB, CATS } from "./data.js";
+import { DUE_VOCAB } from "./duelighed.js";
+import { DUE, DUE_SECTIONS, useDueRound, ScenarioQ, McqQ, OrderQ } from "./Duelighed.jsx";
 
 /* Oversæt-pool: alle tegnings-dele + det rene ordforråd, i ét format. */
 const TERMS = [
   ...PARTS.map((p) => ({ id: p.id, da: p.da, en: p.en, note: p.note, cat: p.game })),
   ...VOCAB,
+  ...DUE_VOCAB,
 ];
 const ROUND = 15; // spørgsmål pr. runde (forkerte svar kommer igen bagefter)
 
@@ -414,6 +417,14 @@ export default function App() {
   const [tDone, setTDone] = useState(false);
   const [tWeak, setTWeak] = useState(() => loadWeak());
 
+  // ---- Duelighed ----
+  const [dueSec, setDueSec] = useState("vige");
+  const [dueStartSec, setDueStart] = useState(null);
+  const due = useDueRound(dueSec);
+  function startDue(sec) { setDueSec(sec); setDueStart(sec); setMode("due"); }
+  // start() skal køre EFTER dueSec er sat (hook'en læser sec fra closure), derfor via effect
+  useEffect(() => { if (mode === "due" && dueStartSec && dueStartSec === dueSec) { due.start(); setDueStart(null); } }, [mode, dueStartSec, dueSec]);
+
   const tOptions = (term) => {
     const same = TERMS.filter((t) => t.cat === term.cat && t.id !== term.id);
     const other = TERMS.filter((t) => t.cat !== term.cat);
@@ -530,6 +541,57 @@ export default function App() {
                   </button>
                 );
               })}
+            </div>
+            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: C.gold, fontWeight: 600, margin: "22px 0 8px" }}>Duelighed</div>
+            <p style={{ margin: "0 0 10px", lineHeight: 1.5, color: "rgba(239,230,210,0.8)", fontSize: 14 }}>Teorien bag den praktiske prøve — efter sejlerskolens egne hæfter.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              {DUE_SECTIONS.map((g) => {
+                const n = DUE.filter((d) => d.sec === g.id).length;
+                return (
+                  <button key={g.id} onClick={() => startDue(g.id)}
+                    style={{ ...btn, background: C.panelHi, border: "1.5px solid rgba(157,179,196,0.3)", color: C.cream, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span><span style={{ display: "block", fontSize: 16 }}>{g.t}</span><span style={{ fontSize: 13, color: "rgba(239,230,210,0.65)", fontWeight: 500 }}>{g.s}</span></span>
+                    <span style={{ fontSize: 13, color: C.gold }}>{n} →</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- DUELIGHED ---------------- */}
+        {mode === "due" && due.state && !due.state.done && (() => {
+          const st = due.state; const q = DUE.find((d) => d.id === st.cur); const meta = DUE_SECTIONS.find((s) => s.id === dueSec);
+          const n = st.asked + 1, total = st.asked + 1 + st.queue.length;
+          const last = st.queue.length === 0 && (st.missed.length === 0 || st.retry);
+          const common = { C, btn, q, onAnswer: due.record, onNext: due.next, last };
+          return (
+            <div style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>{meta.t}</h2>
+                <button onClick={() => setMode("home")} style={back}>← Forside</button>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(239,230,210,0.7)", marginBottom: 8 }}>
+                <span>{st.retry ? "Gentag de forkerte" : "Runde"} — {n}/{total}</span>
+                <span style={{ color: C.gold }}>{st.right} rigtige</span>
+              </div>
+              <div style={{ height: 5, background: "rgba(157,179,196,0.2)", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${(st.asked / total) * 100}%`, background: C.gold, borderRadius: 99, transition: "width .3s" }} />
+              </div>
+              {q.type === "scenario" && <ScenarioQ key={q.id} {...common} />}
+              {q.type === "mcq" && <McqQ key={q.id} {...common} />}
+              {q.type === "order" && <OrderQ key={q.id} {...common} />}
+            </div>
+          );
+        })()}
+        {mode === "due" && due.state && due.state.done && (
+          <div style={{ ...card, textAlign: "center" }}>
+            <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>{DUE_SECTIONS.find((s) => s.id === dueSec).t}</div>
+            <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 52, color: C.sail, lineHeight: 1.1, margin: "6px 0" }}>{due.state.right}<span style={{ fontSize: 28, color: "rgba(239,230,210,0.6)" }}>/{due.state.asked}</span></div>
+            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{due.state.retry ? "De forkerte kom igen — de trækkes oftere næste gang." : "Alt rigtigt i første hug ⚓"}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button onClick={() => startDue(dueSec)} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>Ny runde</button>
+              <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>Forside</button>
             </div>
           </div>
         )}
