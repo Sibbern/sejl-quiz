@@ -643,7 +643,7 @@ export default function App() {
                 <div key={b.t} style={{ background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${C.gold}` }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontFamily: "'Fraunces',serif", fontSize: 19, color: C.sail }}>{b.t}</span>
-                    <span style={{ fontSize: 12.5, color: C.gold }}>{b.e}</span>
+                    {lang === "da" && <span style={{ fontSize: 12.5, color: C.gold }}>{b.e}</span>}
                   </div>
                   <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)", marginTop: 3 }}>{b.d}</div>
                 </div>
@@ -665,7 +665,7 @@ export default function App() {
               return (
                 <div style={{ background: C.panelHi, borderRadius: 12, padding: 14, marginBottom: 14, borderLeft: `3px solid ${C.accent}` }}>
                   <div style={{ fontFamily: "'Fraunces',serif", fontSize: 22, color: C.sail }}>{pp.da}</div>
-                  <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>{T.gloss} {pp.en}</div>
+                  {lang === "da" && <div style={{ fontSize: 13, color: C.gold, marginBottom: 6 }}>{T.gloss} {pp.en}</div>}
                   <div style={{ fontSize: 14.5, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{pp.note}</div>
                 </div>
               );
@@ -709,7 +709,7 @@ export default function App() {
             {picked && (
               <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${picked.id === current.id ? C.good : C.accent}` }}>
                 <div style={{ fontWeight: 700, color: picked.id === current.id ? C.good : C.accentSoft, marginBottom: 4 }}>{picked.id === current.id ? T.correct : `${T.itWas} ${current.da}`}</div>
-                <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}><span style={{ color: C.gold }}>{T.gloss} {current.en}.</span> {current.note}</div>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{lang === "da" && <span style={{ color: C.gold }}>{T.gloss} {current.en}. </span>}{current.note}</div>
                 <button onClick={next} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{idx + 1 >= order.length ? T.seeResult : T.next}</button>
               </div>
             )}
