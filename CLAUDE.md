@@ -209,3 +209,10 @@ The real app only ever mounts one diagram at a time, so there's no duplication t
 - Scenario geometry: `wind` = direction the wind comes FROM (0 = top), `hdg` 0 = up / 90 = right. Tack is DERIVED in the drawing (boom in lee) — never hardcode it. `windAt` moves the wind arrow along the rim when a boat is in the way. Cross-check answers with a script like `/tmp/geo.mjs` (recompute tack/windward/starboard-side from the data and compare to `answer`) before trusting a new scenario.
 - Question components are keyed on `${id}:${seq}`: the retry round can start with the id that just ended, and a same-key component keeps its disabled state (found in blind review).
 - Contact sheet of all scenarios: `verify-due.html` → `scripts/verifyDue.jsx` (dev server, open the URL, screenshot). Check: labels clear of hulls/VIND, sail on the leeward side, course line matches heading.
+
+## Language toggle (DA/EN)
+
+- Danish is the source of truth. `src/en.js` is an overlay keyed by id (`EN.parts/vocab/due/games/sections/cats/basics`) plus `UI` strings. `localize(lang)` in `App.jsx` merges it; missing keys fall back to Danish, so a partial translation never breaks the app.
+- In EN mode the diagram parts SWAP `da`/`en` so the quiz asks for the English word and shows Danish as the gloss. Oversæt always uses the raw TERMS (true da↔en).
+- Adding content: add the Danish entry first, then its id in `en.js`. A quick completeness check: `node -e` import both files and list DUE/PARTS/VOCAB ids missing in EN (see git history for the one-liner).
+- Lang persists in `localStorage["sejl-quiz:lang"]`; toggling returns to home so no in-flight round keeps old-language options.
