@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { PARTS, GAMES, BASICS, VOCAB, CATS } from "./data.js";
-import { DUE_VOCAB } from "./duelighed.js";
-import { DUE, DUE_SECTIONS, useDueRound, ScenarioQ, McqQ, OrderQ } from "./Duelighed.jsx";
+import { DUE, DUE_SECTIONS, DUE_VOCAB } from "./duelighed.js";
+import { useDueRound, ScenarioQ, McqQ, OrderQ } from "./Duelighed.jsx";
 
 /* Oversæt-pool: alle tegnings-dele + det rene ordforråd, i ét format. */
 const TERMS = [
@@ -578,9 +578,10 @@ export default function App() {
               <div style={{ height: 5, background: "rgba(157,179,196,0.2)", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${(st.asked / total) * 100}%`, background: C.gold, borderRadius: 99, transition: "width .3s" }} />
               </div>
-              {q.type === "scenario" && <ScenarioQ key={q.id} {...common} />}
-              {q.type === "mcq" && <McqQ key={q.id} {...common} />}
-              {q.type === "order" && <OrderQ key={q.id} {...common} />}
+              {/* key inkluderer seq: gentage-runden kan starte med samme id som sidste spørgsmål, og så skal komponenten remountes */}
+              {q.type === "scenario" && <ScenarioQ key={`${q.id}:${st.seq}`} {...common} />}
+              {q.type === "mcq" && <McqQ key={`${q.id}:${st.seq}`} {...common} />}
+              {q.type === "order" && <OrderQ key={`${q.id}:${st.seq}`} {...common} />}
             </div>
           );
         })()}

@@ -13,7 +13,7 @@ import { DUE, DUE_SECTIONS, tackOf } from "./duelighed.js";
 
 const ROUND = 12;
 const KEY = (sec) => `sejl-quiz:due:${sec}`;
-function loadWeak(sec) { try { return JSON.parse(localStorage.getItem(KEY(sec)) || "{}"); } catch { return {}; } }
+function loadWeak(sec) { try { const v = JSON.parse(localStorage.getItem(KEY(sec)) || "{}"); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } }
 function saveWeak(sec, w) { try { localStorage.setItem(KEY(sec), JSON.stringify(w)); } catch {} }
 function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
@@ -27,7 +27,7 @@ function Boat({ C, kind, hdg, x, y, wind, label }) {
     <g transform={`translate(${x},${y}) rotate(${hdg})`}>
       {/* kurslinje frem fra stævnen — gør retningen entydig */}
       <path d="M0,-34 L0,-70 M0,-70 l-5,8 M0,-70 l5,8" stroke={C.steel} strokeOpacity="0.7" strokeWidth="1.6" fill="none" strokeDasharray="3 3" />
-      <path d={hull} fill="#1b4a66" stroke={C.cream} strokeWidth="1.8" />
+      <path d={hull} fill={C.panelHi} stroke={C.cream} strokeWidth="1.8" />
       {kind === "sail" && (
         <g>
           {/* bom + storsejl i læ, agterud fra masten */}
@@ -47,7 +47,9 @@ function Boat({ C, kind, hdg, x, y, wind, label }) {
           <line x1="-11" y1="-2" x2="-28" y2="8" /><line x1="11" y1="-2" x2="28" y2="8" />
         </g>
       )}
-      <text x="0" y="46" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.cream} transform={`rotate(${-hdg} 0 46)`}>{label}</text>
+      {/* label altid under båden på skærmen: agter hvis båden peger op, foran stævnen hvis den peger ned */}
+      {(() => { const h = ((hdg % 360) + 360) % 360; const side = h > 45 && h < 135 || h > 225 && h < 315; const ly = h > 90 && h < 270 ? (side ? -92 : -82) : (side ? 60 : 54);
+        return <text x="0" y={ly} textAnchor="middle" fontSize="13" fontWeight="700" fill={C.cream} transform={`rotate(${-hdg} 0 ${ly})`}>{label}</text>; })()}
     </g>
   );
 }
@@ -57,11 +59,11 @@ export function ScenarioDiagram({ C, s }) {
   // Pilen sidder i kanten i vindens retning, men kan flyttes langs kanten (windAt) hvis en båd er i vejen
   const r = (s.wind * Math.PI) / 180;
   const ra = ((s.windAt ?? s.wind) * Math.PI) / 180;
-  const cx = 150 + Math.sin(ra) * 112, cy = 150 - Math.cos(ra) * 112;
+  const cx = 150 + Math.sin(ra) * 104, cy = 150 - Math.cos(ra) * 104;
   const kindName = { sail: "sejl", motor: "motor", row: "robåd" };
   return (
     <svg viewBox="0 0 300 300" width="100%" style={{ display: "block", maxHeight: 300 }}>
-      <rect x="0" y="0" width="300" height="300" rx="14" fill="#0d2b3e" />
+      <rect x="0" y="0" width="300" height="300" rx="14" fill={C.bg} />
       {/* vand-hint */}
       {[60, 120, 180, 240].map((yy) => <path key={yy} d={`M20,${yy} q20,-6 40,0 t40,0 t40,0 t40,0 t40,0 t40,0`} fill="none" stroke={C.steel} strokeOpacity="0.12" />)}
       {/* vindpil */}
@@ -70,11 +72,11 @@ export function ScenarioDiagram({ C, s }) {
           <path d="M0,-10 L0,22 M0,22 l-6,-8 M0,22 l6,-8" stroke={C.steel} strokeWidth="2.2" fill="none" />
         </g>
         {/* teksten holdes vandret, placeret på vindsiden af pilen */}
-        <text x={Math.sin(r) * 22} y={-Math.cos(r) * 22 + 4} textAnchor="middle" fontSize="11" letterSpacing="2" fontWeight="700" fill={C.gold}>VIND</text>
+        <text x={Math.max(-cx + 24, Math.min(300 - cx - 24, Math.sin(r) * 22))} y={-Math.cos(r) * 22 + 4} textAnchor="middle" fontSize="11" letterSpacing="2" fontWeight="700" fill={C.gold}>VIND</text>
       </g>
-      {s.overtaking && (
-        <path d={`M${s.a.x},${s.a.y - 34} L${s.b.x},${s.b.y + 34}`} stroke={C.steel} strokeOpacity="0.45" strokeWidth="1.5" strokeDasharray="4 4" />
-      )}
+      {s.overtaking && (() => { const o = s.overtaking === "b" ? s.b : s.a, t = o === s.a ? s.b : s.a; return (
+        <path d={`M${o.x},${o.y - 34} L${t.x},${t.y + 34}`} stroke={C.steel} strokeOpacity="0.45" strokeWidth="1.5" strokeDasharray="4 4" />
+      ); })()}
       <Boat C={C} {...s.a} wind={s.wind} label={`A · ${kindName[s.a.kind]}`} />
       <Boat C={C} {...s.b} wind={s.wind} label={`B · ${kindName[s.b.kind]}`} />
     </svg>
@@ -89,7 +91,8 @@ export function useDueRound(sec) {
     const weak = loadWeak(sec);
     const weighted = pool.flatMap((d) => Array(Math.min(4, 1 + (weak[d.id] || 0))).fill(d.id));
     const q = []; for (const id of shuffle(weighted)) { if (!q.includes(id)) q.push(id); if (q.length === ROUND) break; }
-    setState({ queue: q.slice(1), cur: q[0], asked: 0, right: 0, missed: [], retry: false, done: false, weak });
+    if (q.length === 0) { setState({ queue: [], cur: null, seq: 0, asked: 0, right: 0, missed: [], retry: false, done: true, weak }); return; }
+    setState({ queue: q.slice(1), cur: q[0], seq: 0, asked: 0, right: 0, missed: [], retry: false, done: false, weak });
   }
   function record(ok) {
     setState((st) => {
@@ -106,7 +109,7 @@ export function useDueRound(sec) {
         if (missed.length === 0 || retry) return { ...st, done: true };
         q = shuffle(missed); missed = []; retry = true;
       }
-      return { ...st, cur: q[0], queue: q.slice(1), retry, missed };
+      return { ...st, cur: q[0], queue: q.slice(1), retry, missed, seq: st.seq + 1 };
     });
   }
   return { state, start, record, next };
@@ -140,14 +143,14 @@ export function ScenarioQ({ C, btn, q, onAnswer, onNext, last }) {
   const label = { a: "A viger", b: "B viger", both: "Begge viger", none: "Ingen viger" };
   return (
     <div>
-      <div style={{ ...{ background: "#0d2b3e", borderRadius: 12, padding: 6, marginBottom: 12 } }}><ScenarioDiagram C={C} s={q} /></div>
+      <div style={{ background: C.bg, borderRadius: 12, padding: 6, marginBottom: 12 }}><ScenarioDiagram C={C} s={q} /></div>
       <p style={{ margin: "0 0 12px", fontSize: 16, color: C.sail }}>Hvem skal vige?</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {opts.map(([k, l]) => (
           <button key={k} disabled={!!picked} onClick={() => { setPicked(k); onAnswer(k === q.answer); }} style={optStyle(C, btn, picked, k === q.answer, k === picked)}>{l}</button>
         ))}
       </div>
-      {picked && <Feedback C={C} btn={btn} ok={picked === q.answer} title={`Rigtigt svar: ${label[q.answer]} (regel ${q.rule})`} note={q.note} onNext={onNext} last={last} />}
+      {picked && <Feedback C={C} btn={btn} ok={picked === q.answer} title={`Rigtigt svar: ${label[q.answer]} (${q.rule})`} note={q.note} onNext={onNext} last={last} />}
     </div>
   );
 }
@@ -204,4 +207,3 @@ export function OrderQ({ C, btn, q, onAnswer, onNext, last }) {
   );
 }
 
-export { DUE, DUE_SECTIONS };

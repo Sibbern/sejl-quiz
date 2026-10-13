@@ -199,3 +199,13 @@ The real app only ever mounts one diagram at a time, so there's no duplication t
 - Progress/score persistence — now feasible (`localStorage` available; guard for private mode).
 - Audio or pronunciation for terms.
 - "Mixed" quiz mode across all dels once per-del pools are solid.
+
+---
+
+## Duelighed section (added Oct 2026)
+
+- Content: `src/duelighed.js` (`DUE`, `DUE_SECTIONS`, `DUE_VOCAB`, `tackOf`, `windwardOf`). Three question types: `scenario` (vigeregler drawing), `order` (tap steps in sequence), `mcq`. Spec + source attribution: `docs/duelighed-requirements.md`.
+- UI + round engine: `src/Duelighed.jsx` (`useDueRound`, `ScenarioQ`, `OrderQ`, `McqQ`, `ScenarioDiagram`). Exports components/hooks only (Fast Refresh); data comes from `duelighed.js`.
+- Scenario geometry: `wind` = direction the wind comes FROM (0 = top), `hdg` 0 = up / 90 = right. Tack is DERIVED in the drawing (boom in lee) — never hardcode it. `windAt` moves the wind arrow along the rim when a boat is in the way. Cross-check answers with a script like `/tmp/geo.mjs` (recompute tack/windward/starboard-side from the data and compare to `answer`) before trusting a new scenario.
+- Question components are keyed on `${id}:${seq}`: the retry round can start with the id that just ended, and a same-key component keeps its disabled state (found in blind review).
+- Contact sheet of all scenarios: `verify-due.html` → `scripts/verifyDue.jsx` (dev server, open the URL, screenshot). Check: labels clear of hulls/VIND, sail on the leeward side, course line matches heading.
