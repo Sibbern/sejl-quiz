@@ -11,7 +11,7 @@
 export const PARTS = [
   // ---- DEL 1: HELE BÅDEN ----
   { id: "faldbarm",  da: "Faldbarm",  en: "Head",  game: "boat", ax: 196, ay: 54,  note: "Sejlets øverste hjørne — her sætter faldet sejlet fast." },
-  { id: "halsbarm",  da: "Halsbarm",  en: "Tack",  game: "boat", ax: 196, ay: 300, note: "Sejlets forreste nederste hjørne, fastgjort ved masten/bommen." },
+  { id: "halsbarm",  da: "Halsbarm",  en: "Tack (corner)",  game: "boat", ax: 196, ay: 300, note: "Sejlets forreste nederste hjørne, fastgjort ved masten/bommen." },
   { id: "skodebarm", da: "Skødebarm", en: "Clew",  game: "boat", ax: 100, ay: 305, note: "Sejlets bageste nederste hjørne — her sidder skødet." },
   { id: "forlig",    da: "Forlig",    en: "Luff",  game: "boat", line: true, ax: 196, ay: 170, note: "Sejlets forkant. På storsejlet løber den langs masten." },
   { id: "agterlig",  da: "Agterlig",  en: "Leech", game: "boat", line: true, ax: 150, ay: 182, note: "Sejlets bagkant." },
@@ -53,7 +53,7 @@ export const PARTS = [
   { id: "halvvind", da: "Halvvind",    en: "Beam reach",    game: "wind", ax: 278, ay: 210, note: "Vinden kommer ind fra siden, tværs på båden — også kaldet 'på tværs'." },
   { id: "rumskods", da: "Rumskøds",    en: "Broad reach",   game: "wind", ax: 245, ay: 270, note: "Vinden kommer skråt bagfra — 'agten for tværs'." },
   { id: "laens",    da: "Læns",        en: "Running",       game: "wind", ax: 165, ay: 292, note: "Vinden kommer lige bagfra, og båden sejler med vinden." },
-  { id: "vende",    da: "Stagvending", en: "Tack",          game: "wind", line: true, ax: 165, ay: 150, note: "At dreje stævnen op gennem vinden, så vinden skifter side. At 'vende'." },
+  { id: "vende",    da: "Stagvending", en: "Tack (manoeuvre)",          game: "wind", line: true, ax: 165, ay: 150, note: "At dreje stævnen op gennem vinden, så vinden skifter side. At 'vende'." },
   { id: "halse",    da: "Bomning",     en: "Gybe (jibe)",          game: "wind", line: true, ax: 165, ay: 332, note: "At dreje agterenden gennem vinden, så bommen skifter side. At 'halse'." },
 
   // ---- DEL 5: SIDER & HALSE ----

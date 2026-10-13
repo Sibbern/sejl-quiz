@@ -31,9 +31,10 @@ function Boat({ C, kind, hdg, x, y, wind, label }) {
       {kind === "sail" && (
         <g>
           {/* bom + storsejl i læ, agterud fra masten */}
-          <path d={`M0,-6 L${boomSide * 17},16 Q${boomSide * 4},8 0,-6 Z`} fill={C.sail} fillOpacity="0.9" />
-          <line x1="0" y1="-6" x2={boomSide * 17} y2="16" stroke={C.mast} strokeWidth="2.2" />
-          <circle cx="0" cy="-6" r="2.6" fill={C.mast} />
+          {/* storsejl: fra masten agterud, bugter ud i læ; bommen som tyk streg */}
+          <path d={`M0,-8 L${boomSide * 22},18 Q${boomSide * 13},-2 0,-8 Z`} fill={C.sail} fillOpacity="0.95" />
+          <line x1="0" y1="-8" x2={boomSide * 22} y2="18" stroke={C.mast} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="0" cy="-8" r="3" fill={C.mast} />
         </g>
       )}
       {kind === "motor" && (

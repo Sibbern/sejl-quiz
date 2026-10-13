@@ -290,7 +290,7 @@ function MastBottom({ active, label }) {
   );
 }
 
-function WindDiagram({ active, label }) {
+function WindDiagram({ active, label, windWord = "VIND" }) {
   const isA = (id) => active === id;
   const p = PARTS.find((x) => x.id === active);
   const F = (id) => (isA(id) ? "url(#glow)" : undefined);
@@ -306,7 +306,7 @@ function WindDiagram({ active, label }) {
       <defs>{glow}</defs>
 
       {/* vind ovenfra */}
-      <text x="165" y="16" textAnchor="middle" fontFamily="'Hanken Grotesk',sans-serif" fontSize="11" fontWeight="700" fill={C.gold} letterSpacing="3">VIND</text>
+      <text x="165" y="16" textAnchor="middle" fontFamily="'Hanken Grotesk',sans-serif" fontSize="11" fontWeight="700" fill={C.gold} letterSpacing="3">{windWord}</text>
       {[120, 165, 210].map((x) => (
         <g key={x} stroke={C.steel} strokeOpacity="0.5" strokeWidth="2" fill="none">
           <line x1={x} y1="26" x2={x} y2="64" />
@@ -345,7 +345,7 @@ function WindDiagram({ active, label }) {
 /*  DEL 5 — Sider & halse                                              */
 /* ------------------------------------------------------------------ */
 
-function SideDiagram({ active, label }) {
+function SideDiagram({ active, label, windWord = "VIND" }) {
   const isA = (id) => active === id;
   const p = PARTS.find((x) => x.id === active);
   const F = (id) => (isA(id) ? "url(#glow)" : undefined);
@@ -374,7 +374,7 @@ function SideDiagram({ active, label }) {
       <path d="M160,50 L165,42 L170,50" fill="none" stroke={C.steel} strokeOpacity="0.4" strokeWidth="2" />
 
       {/* vind ind fra styrbord (højre) — definerer luv og læ */}
-      <text x="248" y="82" textAnchor="middle" fontFamily="'Hanken Grotesk',sans-serif" fontSize="10" fontWeight="700" fill={C.gold} letterSpacing="2">VIND</text>
+      <text x="248" y="82" textAnchor="middle" fontFamily="'Hanken Grotesk',sans-serif" fontSize="10" fontWeight="700" fill={C.gold} letterSpacing="2">{windWord}</text>
       {[100, 116, 132].map((y) => (
         <g key={y} stroke={C.steel} strokeOpacity="0.5" strokeWidth="2" fill="none">
           <line x1="256" y1={y} x2="214" y2={y} />
@@ -396,11 +396,11 @@ function SideDiagram({ active, label }) {
   );
 }
 
-function Diagram({ game, active, label }) {
+function Diagram({ game, active, label, windWord }) {
   if (game === "top") return <MastTop active={active} label={label} />;
   if (game === "bottom") return <MastBottom active={active} label={label} />;
-  if (game === "wind") return <WindDiagram active={active} label={label} />;
-  if (game === "sides") return <SideDiagram active={active} label={label} />;
+  if (game === "wind") return <WindDiagram active={active} label={label} windWord={windWord} />;
+  if (game === "sides") return <SideDiagram active={active} label={label} windWord={windWord} />;
   return <BoatWhole active={active} label={label} />;
 }
 
@@ -447,16 +447,22 @@ export default function App() {
   // start() skal køre EFTER dueSec er sat (hook'en læser sec fra closure), derfor via effect
   useEffect(() => { if (mode === "due" && dueStartSec && dueStartSec === dueSec) { due.start(); setDueStart(null); } }, [mode, dueStartSec, dueSec]);
 
-  const tOptions = (term) => {
-    const same = TERMS.filter((t) => t.cat === term.cat && t.id !== term.id);
-    const other = TERMS.filter((t) => t.cat !== term.cat);
-    const dist = [...shuffle(same).slice(0, 3), ...shuffle(other)].slice(0, 3);
+  // Termer med samme ord i svar-sproget (fx Rumskøds/Slør = "Broad reach") må ikke være forkerte svar til hinanden
+  const sameWord = (x, y, key) => { const v = (s) => s.split("/").map(norm); return v(x[key]).some((a) => v(y[key]).includes(a)); };
+  const tOptions = (term, dir) => {
+    const key = dir === "da2en" ? "en" : "da";
+    const clash = (t) => sameWord(t, term, "en") || sameWord(t, term, "da") || sameWord(t, term, key);
+    const same = TERMS.filter((t) => t.cat === term.cat && t.id !== term.id && !clash(t));
+    const other = TERMS.filter((t) => t.cat !== term.cat && !clash(t));
+    // Forkerte svar må heller ikke dublere hinanden i det viste sprog
+    const uniq = (list) => { const seen = new Set([norm(term[key])]); return list.filter((t) => { const k = norm(t[key]); if (seen.has(k)) return false; seen.add(k); return true; }); };
+    const dist = uniq([...shuffle(same), ...shuffle(other)]).slice(0, 3);
     return shuffle([term, ...dist]);
   };
   const tMake = (id, dir) => {
     const term = TERMS.find((t) => t.id === id);
     const d = dir === "mix" ? (Math.random() < 0.5 ? "da2en" : "en2da") : dir;
-    return { term, dir: d, options: tOptions(term) };
+    return { term, dir: d, options: tOptions(term, d) };
   };
   function startTranslate(dir = tDir, kind = tKind) {
     // Ord du har svaret forkert på tidligere, trækkes oftere (vægt 1 + antal fejl, maks 4)
@@ -478,8 +484,10 @@ export default function App() {
   }
   function tSubmit() {
     if (tPicked) return;
-    const want = tCur.dir === "da2en" ? tCur.term.en : tCur.term.da;
-    const ok = matches(tTyped, want);
+    // Accepter alle termer der deler prompt-ordet (Slør og Rumskøds er begge "Broad reach")
+    const pk = tCur.dir === "da2en" ? "da" : "en", ak = pk === "da" ? "en" : "da";
+    const wants = TERMS.filter((t) => sameWord(t, tCur.term, pk)).map((t) => t[ak]);
+    const ok = wants.some((w) => matches(tTyped, w));
     setTPicked({ id: ok ? tCur.term.id : null, text: tTyped }); tRecord(ok);
   }
   function tNext() {
@@ -543,7 +551,7 @@ export default function App() {
 
         {(mode === "home" || mode === "study" || mode === "quiz") && (
           <div style={{ ...card, padding: 8, marginBottom: 14, background: "#0d2b3e" }}>
-            <Diagram game={mode === "home" ? "boat" : game} active={mode === "home" ? null : activeId} label={mode === "home" ? null : labelText} />
+            <Diagram game={mode === "home" ? "boat" : game} active={mode === "home" ? null : activeId} label={mode === "home" ? null : labelText} windWord={T.wind} />
           </div>
         )}
 
@@ -701,7 +709,7 @@ export default function App() {
             {picked && (
               <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${picked.id === current.id ? C.good : C.accent}` }}>
                 <div style={{ fontWeight: 700, color: picked.id === current.id ? C.good : C.accentSoft, marginBottom: 4 }}>{picked.id === current.id ? T.correct : `${T.itWas} ${current.da}`}</div>
-                <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}><span style={{ color: C.gold }}>{current.en}.</span> {current.note}</div>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}><span style={{ color: C.gold }}>{T.gloss} {current.en}.</span> {current.note}</div>
                 <button onClick={next} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{idx + 1 >= order.length ? T.seeResult : T.next}</button>
               </div>
             )}
