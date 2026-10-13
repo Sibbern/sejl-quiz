@@ -54,7 +54,7 @@ export const PARTS = [
   { id: "rumskods", da: "Rumskøds",    en: "Broad reach",   game: "wind", ax: 245, ay: 270, note: "Vinden kommer skråt bagfra — 'agten for tværs'." },
   { id: "laens",    da: "Læns",        en: "Running",       game: "wind", ax: 165, ay: 292, note: "Vinden kommer lige bagfra, og båden sejler med vinden." },
   { id: "vende",    da: "Stagvending", en: "Tack",          game: "wind", line: true, ax: 165, ay: 150, note: "At dreje stævnen op gennem vinden, så vinden skifter side. At 'vende'." },
-  { id: "halse",    da: "Bomning",     en: "Gybe",          game: "wind", line: true, ax: 165, ay: 332, note: "At dreje agterenden gennem vinden, så bommen skifter side. At 'halse'." },
+  { id: "halse",    da: "Bomning",     en: "Gybe (jibe)",          game: "wind", line: true, ax: 165, ay: 332, note: "At dreje agterenden gennem vinden, så bommen skifter side. At 'halse'." },
 
   // ---- DEL 5: SIDER & HALSE ----
   { id: "staevn",   da: "Stævn",           en: "Bow",            game: "sides", ax: 165, ay: 80,  note: "Bådens forreste ende — også kaldet forude." },
@@ -73,6 +73,50 @@ export const GAMES = [
   { id: "bottom", t: "Del 3 · Mastefoden",  s: "Det nederste ved dækket" },
   { id: "wind",   t: "Del 4 · Vind & retninger", s: "Vende, halse, sejladser i vinden" },
   { id: "sides",  t: "Del 5 · Sider & halse", s: "Stævn, hæk, styrbord, bagbord" },
+];
+
+/*
+ * Oversæt-ordforråd: termer der IKKE peges på i en tegning (manøvrer, sejlads-
+ * former, grej, skrogtyper). Bruges kun i Oversæt-quizzen sammen med PARTS.
+ * `cat` styrer hvilke forkerte svar der vises (samme kategori = svære distraktorer).
+ * `note` er en huskeregel, ikke en definition — det er den der får ordet til at sidde.
+ */
+export const CATS = {
+  boat: "Sejl & rig", top: "Mastetop", bottom: "Mastefod", wind: "Sejladsformer",
+  sides: "Sider & halse", man: "Manøvrer", gear: "Grej & skrog",
+};
+
+export const VOCAB = [
+  // ---- MANØVRER ----
+  { id: "v_krydse",   da: "At krydse",        en: "To beat (to windward)", cat: "man",  note: "Zigzag op mod vinden med stagvendinger imellem. 'Beat' fordi båden slår sig op mod vinden." },
+  { id: "v_faldeaf",  da: "At falde af",      en: "To bear away",          cat: "man",  note: "Dreje VÆK fra vinden. Du 'falder' ned ad vindrosen, væk fra vindøjet." },
+  { id: "v_luffe",    da: "At luffe",         en: "To head up / luff up",  cat: "man",  note: "Dreje OP mod vinden. Luv = vindsiden, så at luffe er at gå op mod luv." },
+  { id: "v_skodeind", da: "At skøde ind",     en: "To sheet in",           cat: "man",  note: "Hale skødet hjem, så sejlet står tættere på båden. Samme ord: sheet = skøde." },
+  { id: "v_skodeud",  da: "At skøde ud",      en: "To ease the sheet",     cat: "man",  note: "Slække skødet, så sejlet står længere ude. 'Ease' = give slip stille og roligt." },
+  { id: "v_rebe",     da: "At rebe",          en: "To reef",               cat: "man",  note: "Gøre sejlet mindre i hård vind. Næsten samme ord på begge sprog." },
+  { id: "v_ista",     da: "At ligge i stå",   en: "To be in irons",        cat: "man",  note: "Båden står stille med stævnen i vinden og sejlene blafrer. 'In irons' = lænket fast." },
+  { id: "v_kraenge",  da: "At krænge",        en: "To heel",               cat: "man",  note: "Båden lægger sig over på siden i vinden og BLIVER der. Ikke det samme som at rulle." },
+  { id: "v_rulle",    da: "At rulle",         en: "To roll",               cat: "man",  note: "Vippe fra side til side — for anker i dønninger eller på læns. Masten som en metronom." },
+  { id: "v_ufrivillig",da: "Ufrivillig bomning", en: "Accidental gybe (jibe)",   cat: "man",  note: "Bommen svinger over uden at du har bedt om det — på læns når vinden går om bag storsejlet." },
+  { id: "v_laeggetil",da: "At lægge til",     en: "To come alongside / dock", cat: "man", note: "Lægge båden ind til kaj eller bro. 'Alongside' = langs siden af." },
+  // ---- SEJLADSFORMER (supplement til Del 4) ----
+  { id: "v_platlaens",da: "Plat læns",        en: "Dead run",              cat: "wind", note: "Vinden lige agten ind. 'Dead' = præcis, lige bagfra." },
+  { id: "v_rumvind",  da: "Rum vind",         en: "Off the wind / free wind", cat: "wind", note: "Alt agten for tværs — vinden er 'rummelig', du har plads at sejle på." },
+  { id: "v_slor",     da: "Slør",             en: "Broad reach",           cat: "wind", note: "Samme som rumskøds — vinden skråt bagfra. To danske ord, ét engelsk." },
+  { id: "v_sommerfugl",da: "Sommerfugl",      en: "Goose-winged",          cat: "wind", note: "Fok på én side, storsejl på den anden, på læns. Dansk: sommerfugl, engelsk: gåsevinger." },
+  { id: "v_vindoje",  da: "Vindøjet",         en: "The eye of the wind",   cat: "wind", note: "Retningen vinden kommer præcis fra. Direkte oversat." },
+  // ---- GREJ & SKROG ----
+  { id: "v_genua",    da: "Genua",            en: "Genoa",                 cat: "gear", note: "Stort forsejl der overlapper masten. Byen Genova på begge sprog." },
+  { id: "v_spiler",   da: "Spiler",           en: "Spinnaker",             cat: "gear", note: "Det store ballonsejl til læns og slør." },
+  { id: "v_rorpind",  da: "Rorpind",          en: "Tiller",                cat: "gear", note: "Pinden du styrer med på små både. Et rat hedder 'wheel'." },
+  { id: "v_ror",      da: "Ror",              en: "Rudder",                cat: "gear", note: "Pladen under vandet der drejer båden." },
+  { id: "v_kol",      da: "Køl",              en: "Keel",                  cat: "gear", note: "Vægten under båden der retter den op igen. Næsten samme ord." },
+  { id: "v_dybgang",  da: "Dybgang",          en: "Draught (draft)",       cat: "gear", note: "Hvor dybt båden stikker. Afgør hvor du kan ankre." },
+  { id: "v_fortojning",da: "Fortøjning",      en: "Mooring line",          cat: "gear", note: "Tovet du binder båden fast med i havn." },
+  { id: "v_klampe",   da: "Klampe",           en: "Cleat",                 cat: "gear", note: "Beslaget du gør fortøjningen fast på. (Spilaflaster hedder også 'clutch', ikke cleat.)" },
+  { id: "v_enkeltskrog",da: "Enkeltskrogsbåd",en: "Monohull",              cat: "gear", note: "Ét skrog. Krænger, ruller — og advarer dig." },
+  { id: "v_katamaran",da: "Katamaran",        en: "Catamaran",             cat: "gear", note: "To skrog. Flad, bred — og uden advarsel før den kæntrer." },
+  { id: "v_trimaran", da: "Trimaran",         en: "Trimaran",              cat: "gear", note: "Tre skrog, hurtigst. Dragonfly fra Skærbæk kan folde sig sammen." },
 ];
 
 export const BASICS = [
