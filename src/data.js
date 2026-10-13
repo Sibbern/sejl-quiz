@@ -54,7 +54,7 @@ export const PARTS = [
   { id: "rumskods", da: "Rumskøds",    en: "Broad reach",   game: "wind", ax: 245, ay: 270, note: "Vinden kommer skråt bagfra — 'agten for tværs'." },
   { id: "laens",    da: "Læns",        en: "Running",       game: "wind", ax: 165, ay: 292, note: "Vinden kommer lige bagfra, og båden sejler med vinden." },
   { id: "vende",    da: "Stagvending", en: "Tack",          game: "wind", line: true, ax: 165, ay: 150, note: "At dreje stævnen op gennem vinden, så vinden skifter side. At 'vende'." },
-  { id: "halse",    da: "Bomning",     en: "Gybe",          game: "wind", line: true, ax: 165, ay: 332, note: "At dreje agterenden gennem vinden, så bommen skifter side. At 'halse'." },
+  { id: "halse",    da: "Bomning",     en: "Gybe (jibe)",          game: "wind", line: true, ax: 165, ay: 332, note: "At dreje agterenden gennem vinden, så bommen skifter side. At 'halse'." },
 
   // ---- DEL 5: SIDER & HALSE ----
   { id: "staevn",   da: "Stævn",           en: "Bow",            game: "sides", ax: 165, ay: 80,  note: "Bådens forreste ende — også kaldet forude." },
@@ -97,7 +97,7 @@ export const VOCAB = [
   { id: "v_ista",     da: "At ligge i stå",   en: "To be in irons",        cat: "man",  note: "Båden står stille med stævnen i vinden og sejlene blafrer. 'In irons' = lænket fast." },
   { id: "v_kraenge",  da: "At krænge",        en: "To heel",               cat: "man",  note: "Båden lægger sig over på siden i vinden og BLIVER der. Ikke det samme som at rulle." },
   { id: "v_rulle",    da: "At rulle",         en: "To roll",               cat: "man",  note: "Vippe fra side til side — for anker i dønninger eller på læns. Masten som en metronom." },
-  { id: "v_ufrivillig",da: "Ufrivillig bomning", en: "Accidental gybe",   cat: "man",  note: "Bommen svinger over uden at du har bedt om det — på læns når vinden går om bag storsejlet." },
+  { id: "v_ufrivillig",da: "Ufrivillig bomning", en: "Accidental gybe (jibe)",   cat: "man",  note: "Bommen svinger over uden at du har bedt om det — på læns når vinden går om bag storsejlet." },
   { id: "v_laeggetil",da: "At lægge til",     en: "To come alongside / dock", cat: "man", note: "Lægge båden ind til kaj eller bro. 'Alongside' = langs siden af." },
   // ---- SEJLADSFORMER (supplement til Del 4) ----
   { id: "v_platlaens",da: "Plat læns",        en: "Dead run",              cat: "wind", note: "Vinden lige agten ind. 'Dead' = præcis, lige bagfra." },

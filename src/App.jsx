@@ -8,6 +8,28 @@ const TERMS = [
 ];
 const ROUND = 15; // spørgsmål pr. runde (forkerte svar kommer igen bagefter)
 
+/* Skriv-svar: normalisér og accepter små stavefejl. "To beat (to windward)" matcher
+   "beat", "to beat", "beat to windward"; "Draught (draft)" matcher "draft". */
+function norm(s) {
+  return s.toLowerCase().replace(/\(.*?\)/g, " ").replace(/^(to|at|en|et)\s+/, "").replace(/[^a-zæøå0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+function lev(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+function matches(typed, want) {
+  const t = norm(typed); if (!t) return false;
+  // Accepter hver variant adskilt af "/" og også parentes-indholdet som selvstændigt svar
+  const variants = [...want.split("/"), ...(want.match(/\((.*?)\)/g) || []).map((x) => x.slice(1, -1))].map(norm).filter(Boolean);
+  return variants.some((v) => t === v || lev(t, v) <= Math.floor(v.length / 5) || v.split(" ").includes(t) && t.length >= 4);
+}
+const WEAK_KEY = "sejl-quiz:weak";
+function loadWeak() { try { return JSON.parse(localStorage.getItem(WEAK_KEY) || "{}"); } catch { return {}; } }
+function saveWeak(w) { try { localStorage.setItem(WEAK_KEY, JSON.stringify(w)); } catch {} }
+
 /* ------------------------------------------------------------------ */
 /*  Theme tokens                                                       */
 /* ------------------------------------------------------------------ */
@@ -382,12 +404,15 @@ export default function App() {
 
   // ---- Oversæt-mode ----
   const [tDir, setTDir] = useState("da2en");      // da2en | en2da | mix
+  const [tKind, setTKind] = useState("choice");    // choice | type
   const [tQueue, setTQueue] = useState([]);        // ids tilbage i runden
   const [tCur, setTCur] = useState(null);          // { term, dir, options }
-  const [tPicked, setTPicked] = useState(null);
+  const [tPicked, setTPicked] = useState(null);    // valgt option (choice) eller { id|null, text } (type)
+  const [tTyped, setTTyped] = useState("");
   const [tScore, setTScore] = useState({ right: 0, asked: 0 });
   const [tMissed, setTMissed] = useState([]);      // ids svaret forkert (kommer igen)
   const [tDone, setTDone] = useState(false);
+  const [tWeak, setTWeak] = useState(() => loadWeak());
 
   const tOptions = (term) => {
     const same = TERMS.filter((t) => t.cat === term.cat && t.id !== term.id);
@@ -400,18 +425,29 @@ export default function App() {
     const d = dir === "mix" ? (Math.random() < 0.5 ? "da2en" : "en2da") : dir;
     return { term, dir: d, options: tOptions(term) };
   };
-  function startTranslate(dir = tDir) {
-    const q = shuffle(TERMS.map((t) => t.id)).slice(0, ROUND);
-    setTDir(dir); setTQueue(q.slice(1)); setTCur(tMake(q[0], dir));
-    setTPicked(null); setTScore({ right: 0, asked: 0 }); setTMissed([]); setTDone(false);
+  function startTranslate(dir = tDir, kind = tKind) {
+    // Ord du har svaret forkert på tidligere, trækkes oftere (vægt 1 + antal fejl, maks 4)
+    const weighted = TERMS.flatMap((t) => Array(Math.min(4, 1 + (tWeak[t.id] || 0))).fill(t.id));
+    const q = []; for (const id of shuffle(weighted)) { if (!q.includes(id)) q.push(id); if (q.length === ROUND) break; }
+    setTDir(dir); setTKind(kind); setTQueue(q.slice(1)); setTCur(tMake(q[0], dir));
+    setTPicked(null); setTTyped(""); setTScore({ right: 0, asked: 0 }); setTMissed([]); setTDone(false);
     setMode("translate");
+  }
+  function tRecord(ok) {
+    setTScore((s) => ({ right: s.right + (ok ? 1 : 0), asked: s.asked + 1 }));
+    const id = tCur.term.id;
+    if (!ok) setTMissed((m) => (m.includes(id) ? m : [...m, id]));
+    setTWeak((w) => { const n = { ...w, [id]: Math.max(0, (w[id] || 0) + (ok ? -1 : 2)) }; if (!n[id]) delete n[id]; saveWeak(n); return n; });
   }
   function tAnswer(o) {
     if (tPicked) return;
-    setTPicked(o);
-    const ok = o.id === tCur.term.id;
-    setTScore((s) => ({ right: s.right + (ok ? 1 : 0), asked: s.asked + 1 }));
-    if (!ok) setTMissed((m) => (m.includes(tCur.term.id) ? m : [...m, tCur.term.id]));
+    setTPicked(o); tRecord(o.id === tCur.term.id);
+  }
+  function tSubmit() {
+    if (tPicked) return;
+    const want = tCur.dir === "da2en" ? tCur.term.en : tCur.term.da;
+    const ok = matches(tTyped, want);
+    setTPicked({ id: ok ? tCur.term.id : null, text: tTyped }); tRecord(ok);
   }
   function tNext() {
     let q = tQueue;
@@ -420,7 +456,7 @@ export default function App() {
       if (tMissed.length === 0 || tDone) { setMode("tresult"); return; }
       q = shuffle(tMissed); setTMissed([]); setTDone(true);
     }
-    setTCur(tMake(q[0], tDir)); setTQueue(q.slice(1)); setTPicked(null);
+    setTCur(tMake(q[0], tDir)); setTQueue(q.slice(1)); setTPicked(null); setTTyped("");
   }
 
   const pool = useMemo(() => PARTS.filter((p) => p.game === game), [game]);
@@ -612,10 +648,16 @@ export default function App() {
                 <h2 style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 19, margin: 0, color: C.sail }}>Oversæt</h2>
                 <button onClick={() => setMode("home")} style={back}>← Forside</button>
               </div>
-              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                 {[["da2en", "Dansk → engelsk"], ["en2da", "Engelsk → dansk"], ["mix", "Blandet"]].map(([k, l]) => (
-                  <button key={k} onClick={() => startTranslate(k)}
+                  <button key={k} onClick={() => startTranslate(k, tKind)}
                     style={{ flex: 1, padding: "7px 4px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "'Hanken Grotesk',sans-serif", background: tDir === k ? C.gold : "rgba(157,179,196,0.12)", color: tDir === k ? C.ink : C.cream, border: `1px solid ${tDir === k ? C.gold : "rgba(157,179,196,0.25)"}` }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                {[["choice", "Vælg blandt 4"], ["type", "Skriv svaret"]].map(([k, l]) => (
+                  <button key={k} onClick={() => startTranslate(tDir, k)}
+                    style={{ flex: 1, padding: "7px 4px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "'Hanken Grotesk',sans-serif", background: tKind === k ? C.accent : "rgba(157,179,196,0.12)", color: tKind === k ? C.ink : C.cream, border: `1px solid ${tKind === k ? C.accent : "rgba(157,179,196,0.25)"}` }}>{l}</button>
                 ))}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(239,230,210,0.7)", marginBottom: 8 }}>
@@ -627,6 +669,7 @@ export default function App() {
               </div>
               <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: C.gold, fontWeight: 600 }}>{CATS[tCur.term.cat]} · {q ? "på engelsk?" : "på dansk?"}</div>
               <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 30, color: C.sail, margin: "4px 0 16px", lineHeight: 1.15 }}>{prompt}</div>
+              {tKind === "choice" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {tCur.options.map((o) => {
                   let bg = "rgba(157,179,196,0.10)", bd = "rgba(157,179,196,0.25)", col = C.cream;
@@ -638,11 +681,19 @@ export default function App() {
                   return <button key={o.id} onClick={() => tAnswer(o)} disabled={!!tPicked} style={{ ...btn, background: bg, border: `1.5px solid ${bd}`, color: col, cursor: tPicked ? "default" : "pointer" }}>{show(o)}</button>;
                 })}
               </div>
+              ) : (
+              <form onSubmit={(e) => { e.preventDefault(); tSubmit(); }} style={{ display: "flex", gap: 8 }}>
+                <input value={tTyped} onChange={(e) => setTTyped(e.target.value)} disabled={!!tPicked} autoFocus autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                  placeholder={q ? "engelsk…" : "dansk…"}
+                  style={{ flex: 1, padding: "13px 14px", borderRadius: 12, fontSize: 17, fontFamily: "'Hanken Grotesk',sans-serif", background: "rgba(157,179,196,0.10)", color: C.sail, border: `1.5px solid ${tPicked ? (ok ? C.good : C.bad) : "rgba(157,179,196,0.35)"}`, outline: "none" }} />
+                <button type="submit" disabled={!!tPicked || !tTyped.trim()} style={{ ...btn, width: "auto", textAlign: "center", background: C.accent, color: C.ink, opacity: tPicked || !tTyped.trim() ? 0.5 : 1 }}>Tjek</button>
+              </form>
+              )}
               {tPicked && (
                 <div style={{ marginTop: 14, background: C.panelHi, borderRadius: 12, padding: 13, borderLeft: `3px solid ${ok ? C.good : C.accent}` }}>
                   <div style={{ fontWeight: 700, color: ok ? C.good : C.accentSoft, marginBottom: 4 }}>{ok ? "Rigtigt!" : `${tCur.term.da} = ${tCur.term.en}`}</div>
                   <div style={{ fontSize: 14, lineHeight: 1.5, color: "rgba(239,230,210,0.85)" }}>{tCur.term.note}</div>
-                  <button onClick={tNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{tQueue.length === 0 && (tMissed.length === 0 || tDone) ? "Se resultat" : "Næste →"}</button>
+                  <button autoFocus={tKind === "type"} onClick={tNext} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink, marginTop: 12 }}>{tQueue.length === 0 && (tMissed.length === 0 || tDone) ? "Se resultat" : "Næste →"}</button>
                 </div>
               )}
             </div>
@@ -653,7 +704,7 @@ export default function App() {
           <div style={{ ...card, textAlign: "center" }}>
             <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: C.gold }}>Oversæt</div>
             <div style={{ fontFamily: "'Fraunces',serif", fontStyle: "italic", fontSize: 52, color: C.sail, lineHeight: 1.1, margin: "6px 0" }}>{tScore.right}<span style={{ fontSize: 28, color: "rgba(239,230,210,0.6)" }}>/{tScore.asked}</span></div>
-            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{tDone ? "De forkerte kom igen — en runde mere i morgen, så sidder de." : "Alt rigtigt i første hug ⚓"}</p>
+            <p style={{ margin: "0 0 18px", color: "rgba(239,230,210,0.8)", fontSize: 15 }}>{tDone ? "De forkerte kom igen — en runde mere i morgen, så sidder de." : "Alt rigtigt i første hug ⚓"}{Object.keys(tWeak).length > 0 && <><br /><span style={{ fontSize: 13, color: "rgba(239,230,210,0.6)" }}>{Object.keys(tWeak).length} ord driller stadig — de kommer oftere i næste runde.</span></>}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button onClick={() => startTranslate()} style={{ ...btn, textAlign: "center", background: C.accent, color: C.ink }}>Ny runde</button>
               <button onClick={() => setMode("home")} style={{ ...btn, textAlign: "center", background: "transparent", color: "rgba(239,230,210,0.7)", border: "1px solid rgba(157,179,196,0.3)" }}>Forside</button>
